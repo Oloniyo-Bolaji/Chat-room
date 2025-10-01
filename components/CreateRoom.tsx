@@ -16,6 +16,7 @@ import { Textarea } from "./ui/textarea";
 import { useState } from "react";
 import { useSession } from "next-auth/react";
 import AvatarUploader from "@/components/UploadButton";
+import { useSocket } from "@/src/hooks/useSocket"; 
 
 type Props = {
   open: boolean;
@@ -23,6 +24,7 @@ type Props = {
 };
 
 type Room = {
+  id?: string; // 👈 backend returns room id
   name: string;
   description: string;
   avatar: string;
@@ -30,6 +32,7 @@ type Room = {
 
 const CreateRoom = ({ open, onOpenChange }: Props) => {
   const { data: session } = useSession();
+  const socket = useSocket(); // 👈 get socket instance
 
   const [roomDetails, setRoomDetails] = useState<Room>({
     name: "",
@@ -38,11 +41,11 @@ const CreateRoom = ({ open, onOpenChange }: Props) => {
   });
 
   const handleCreate = async () => {
-    console.log("Creating room:", roomDetails);
     if (!session?.user?.id) {
       alert("You must be signed in to create a room");
       return;
     }
+
     try {
       const res = await fetch(`/api/rooms/new`, {
         method: "POST",
@@ -57,14 +60,17 @@ const CreateRoom = ({ open, onOpenChange }: Props) => {
         return;
       }
 
+      // ✅ join socket room immediately as creator
+      const createdRoom = data.room;
+      if (createdRoom?.id && socket) {
+        socket.emit("create_room", createdRoom); // notify backend
+        socket.emit("join_room", createdRoom.id); // join the room immediately
+      }
+
       alert("Room Created ✅");
       setRoomDetails({ name: "", description: "", avatar: "" });
     } catch (err) {
-      if (err instanceof Error) {
-        console.error("Save failed:", err.message);
-      } else {
-        console.error("Save failed:", err);
-      }
+      console.error("Save failed:", err);
       alert("An unexpected error occurred");
     } finally {
       onOpenChange(false); // Close modal after submit
