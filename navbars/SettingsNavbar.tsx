@@ -7,7 +7,7 @@ const SettingsNavbar = () => {
   return (
     <nav className="h-12 flex items-center justify-between px-5">
       <div>
-        <Link href="/">
+        <Link href="/Chat">
           <IconTooltip title="Chats" icon={<MessageSquareText />} />
         </Link>
       </div>

@@ -14,6 +14,7 @@ export const authConfig: NextAuthOptions = {
       httpOptions: { timeout: 10000 },
     }),
   ],
+  debug: true,
   secret: process.env.NEXTAUTH_SECRET,
 
   callbacks: {

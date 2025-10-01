@@ -1,4 +1,5 @@
-import io from "socket.io-client";
+import { io } from "socket.io-client";
+
 
 const URL =
   process.env.NODE_ENV === "production"
@@ -8,3 +9,7 @@ const URL =
 export const socket = io(URL, {
   path: "/api/socket",
 });
+
+// lib/socket.ts
+
+

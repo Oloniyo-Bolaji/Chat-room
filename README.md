@@ -35,3 +35,15 @@ The easiest way to deploy your Next.js app is to use the [Vercel Platform](https
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
 
+// ✅ Fetch all users' emails
+const users = await db.select().from(usersTable);
+
+for (const user of users) {
+  if (user.email) {
+    await sendMail({
+      to: user.email,
+      subject: `New Room Created: ${newRoom.roomName}`,
+      text: `${session.user.name} created a new room: ${newRoom.roomName}\n\nDescription: ${newRoom.description}`,
+    });
+  }
+}
