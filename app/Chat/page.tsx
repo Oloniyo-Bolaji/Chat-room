@@ -1,13 +1,12 @@
 //import RoomsPage from '@/components/RoomsPage'
-import HomeNavbar from '@/navbars/HomeNavbar'
+import ChatLayout from '@/components/ChatLayout'
+import ChatNavbar from '@/navbars/ChatNavbar'
 import React from 'react'
-import ChatLayout from '../../components/ChatLayout'
 
 const page = () => {
   return (
     <>
-      <HomeNavbar />
-      {/**<RoomsPage />*/}
+      <ChatNavbar />
       <ChatLayout />
     </>
   )

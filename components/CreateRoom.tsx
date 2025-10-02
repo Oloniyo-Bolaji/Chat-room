@@ -40,42 +40,46 @@ const CreateRoom = ({ open, onOpenChange }: Props) => {
     avatar: "",
   });
 
-  const handleCreate = async () => {
-    if (!session?.user?.id) {
-      alert("You must be signed in to create a room");
+ const handleCreate = async () => {
+  if (!session?.user?.id) {
+    alert("You must be signed in to create a room");
+    return;
+  }
+
+  try {
+    const res = await fetch("/api/rooms/new", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: roomDetails.name,
+        description: roomDetails.description,
+        avatar: roomDetails.avatar,
+        creatorId: session.user.id, // pass creator id
+      }),
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      alert(data.error || "Something went wrong");
       return;
     }
 
-    try {
-      const res = await fetch(`/api/rooms/new`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(roomDetails),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok || !data.success) {
-        alert(data.error || "Something went wrong");
-        return;
-      }
-
-      // ✅ join socket room immediately as creator
-      const createdRoom = data.room;
-      if (createdRoom?.id && socket) {
-        socket.emit("create_room", createdRoom); // notify backend
-        socket.emit("join_room", createdRoom.id); // join the room immediately
-      }
-
-      alert("Room Created ✅");
-      setRoomDetails({ name: "", description: "", avatar: "" });
-    } catch (err) {
-      console.error("Save failed:", err);
-      alert("An unexpected error occurred");
-    } finally {
-      onOpenChange(false); // Close modal after submit
+    // Server already broadcasted "room_created" to everyone.
+    // Join the socket room so creator receives receive_message events immediately.
+    const createdRoom = data.room;
+    if (createdRoom?.id && socket) {
+      socket.emit("join_room", createdRoom.id);
     }
-  };
+
+    // close modal, reset form
+    setRoomDetails({ name: "", description: "", avatar: "" });
+    onOpenChange(false);
+  } catch (err) {
+    console.error("Create failed:", err);
+    alert("An unexpected error occurred");
+    onOpenChange(false);
+  }
+};
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>

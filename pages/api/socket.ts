@@ -36,6 +36,11 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
         console.log(`👥 Socket ${socket.id} joined room ${roomId}`);
       });
 
+      socket.on("send_message", (msgPayload) => {
+        // Broadcast to everyone in the room immediately
+        io.to(msgPayload.roomId).emit("receive_message", msgPayload);
+      });
+      
       // If the creator makes a new room, join automatically
       socket.on("create_room", (room) => {
         socket.join(room.id); // 👈 ensure creator joins their own room
@@ -43,14 +48,6 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
         console.log(`📌 Creator ${socket.id} joined room ${room.id}`);
       });
 
-      // Handle sending messages
-      socket.on("send_message", (msgPayload) => {
-        console.log("📨 Message received:", msgPayload);
-
-        // Broadcast message to everyone in the room (including creator)
-        io.to(msgPayload.roomId).emit("receive_message", msgPayload);
-      });
-      
       socket.on("disconnect", () => {
         console.log("❌ User disconnected:", socket.id);
       });

@@ -1,5 +1,5 @@
 import { db } from "@/lib/database";
-import { roomsTable } from "@/lib/database/schema";
+import { messagesTable } from "@/lib/database/schema";
 import { eq } from "drizzle-orm";
 
 export async function GET(
@@ -16,23 +16,15 @@ export async function GET(
       );
     }
 
-    // Fetch room with messages
-    const room = await db
-      .select()
-      .from(roomsTable)
-      .where(eq(roomsTable.id, roomId))
-      .limit(1);
-
-    if (!room.length) {
-      return new Response(
-        JSON.stringify({ success: false, error: "Room not found" }),
-        { status: 404 }
-      );
-    }
-
-    const messages = Array.isArray(room[0].messages)
-      ? room[0].messages
-      : [];
+    // Get all messages in the room with sender details
+    const messages = await db.query.messagesTable.findMany({
+      where: eq(messagesTable.roomId, roomId),
+      with: {
+        sender: true,
+        room: true, 
+      },
+      orderBy: (msg, { asc }) => [asc(msg.createdAt)],
+    });
 
     return new Response(
       JSON.stringify({ success: true, messages }),

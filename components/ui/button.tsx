@@ -22,6 +22,7 @@ const buttonVariants = cva(
         link: "text-neutral-900 underline-offset-4 hover:underline dark:text-neutral-50",
         success: "bg-green-600 text-white",
         danger: "bg-red-600 text-white",
+        colored: "bg-[#9B5DE5] text-white",
         dangerOutline:
           "border border-red-400 text-red-400 bg-transparent hover:bg-transparent hover:border-red-600 hover:text-red-600",
       },

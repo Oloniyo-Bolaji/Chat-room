@@ -39,7 +39,6 @@ export async function POST(req: Request, res: NextApiResponse) {
         roomName: body.name,
         description: body.description,
         avatar: body.avatar,
-        messages: [],
         creatorId: userId,
       })
       .returning();

@@ -47,3 +47,22 @@ for (const user of users) {
     });
   }
 }
+
+
+        <div>
+          <h1>AVailable Rooms</h1>
+          {availableRooms.map((room) => (
+            <ChatJoinCard
+              key={room.id}
+              name={room.roomName}
+              avatarUrl={room.avatar}
+              onClick={() => joinRoom(room.id)}
+            />
+          ))}
+        </div>
+
+        lastMessage={
+              room.messages.length > 0
+                ? room.messages[room.messages.length - 1].text
+                : ""
+            }
