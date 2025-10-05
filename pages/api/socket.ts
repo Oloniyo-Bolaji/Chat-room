@@ -38,6 +38,7 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
 
       socket.on("send_message", (msgPayload) => {
         // Broadcast to everyone in the room immediately
+        console.log("new message:", msgPayload)
         io.to(msgPayload.roomId).emit("receive_message", msgPayload);
       });
       

@@ -5,9 +5,8 @@ import { eq } from "drizzle-orm";
 import { getServerSession } from "next-auth";
 import { authConfig } from "@/auth";
 
-import type { NextApiResponse } from "next";
 
-export async function POST(req: Request, res: NextApiResponse) {
+export async function POST(req: Request) {
   const session = await getServerSession(authConfig);
 
   if (!session || !session.user?.id) {

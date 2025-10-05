@@ -20,6 +20,7 @@ export type Room = {
 
 export type ChatMessage = {
   text: string;
+  roomId:string;
   senderId: string;
   timestamp: string;
   sender: User;

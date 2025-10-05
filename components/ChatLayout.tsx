@@ -1,23 +1,29 @@
 "use client";
 
 import { useSocket } from "@/src/hooks/useSocket";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import ChatUserCard from "./ChatCard";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Send } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { User, Room, ChatMessage } from "@/src/types";
 import ChatJoinCard from "./ChatJoinCard";
+import Message from "./ChatMessage";
 
 const ChatLayout = () => {
   const socket = useSocket();
   const { data: session } = useSession();
+  const chatEndRef = useRef<HTMLDivElement>(null);
   const [joinedRooms, setJoinedRooms] = useState<Room[]>([]);
   const [availableRooms, setAvailableRooms] = useState<Room[]>([]);
   const [selectedChat, setSelectedChat] = useState<Room | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [message, setMessage] = useState<string>("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   // Fetch all rooms on page load
   useEffect(() => {
@@ -63,6 +69,11 @@ const ChatLayout = () => {
 
   // Select a chat (load messages + room details)
   const selectChat = async (id: string) => {
+    if (socket) {
+      socket.emit("join_room", id);
+      console.log(`Joined socket room: ${id}`);
+    }
+
     try {
       // Fetch room details
       const roomRes = await fetch(`/api/rooms/${id}`);
@@ -87,7 +98,9 @@ const ChatLayout = () => {
     if (!socket || !selectedChat) return;
 
     const handleReceiveMessage = (newMessage: ChatMessage) => {
-      setMessages((prev) => [...prev, newMessage]);
+      if (selectedChat && newMessage.roomId === selectedChat.id) {
+        setMessages((prev) => [...prev, newMessage]);
+      }
     };
 
     socket.on("receive_message", handleReceiveMessage);
@@ -110,6 +123,12 @@ const ChatLayout = () => {
       senderId: session.user.id,
       text: message,
       timestamp: new Date().toISOString(),
+      sender: {
+        id: session.user.id,
+        name: session.user.name ?? "Unknown",
+        email: session.user.email ?? "",
+        image: session.user.image ?? null,
+      },
     };
 
     // 1. Emit immediately (real-time)
@@ -128,6 +147,13 @@ const ChatLayout = () => {
     }
 
     setMessage("");
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
   };
 
   const joinRoom = async (roomId: string) => {
@@ -224,32 +250,13 @@ const ChatLayout = () => {
               {messages.length > 0 ? (
                 messages.map((msg, idx) => {
                   const isMine = msg.senderId === session?.user?.id;
-                  return (
-                    <div
-                      key={idx}
-                      className={`flex ${
-                        isMine ? "justify-end" : "justify-start"
-                      }`}
-                    >
-                      <div
-                        className={`px-3 py-2 rounded-lg max-w-xs ${
-                          isMine
-                            ? "bg-[#9B5DE5] text-white"
-                            : "bg-[#9B5DE540] text-gray-900"
-                        }`}
-                      >
-                        <p className="text-sm">{msg.text}</p>
-                        <span className="block text-xs opacity-70 mt-1">
-                          {msg.sender?.name ?? "Unknown"}
-                        </span>
-                      </div>
-                    </div>
-                  );
+                  return <Message key={idx} isMine={isMine} msg={msg} />;
                 })
               ) : (
                 <p className="text-gray-500">No messages yet...</p>
               )}
             </div>
+            <div ref={chatEndRef} />
 
             {/* Input */}
             <div className="p-4 border-t flex">
@@ -257,6 +264,7 @@ const ChatLayout = () => {
                 type="text"
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
+                onKeyPress={handleKeyPress}
                 placeholder="Type a message"
                 className="flex-1 border rounded px-3 py-2"
               />

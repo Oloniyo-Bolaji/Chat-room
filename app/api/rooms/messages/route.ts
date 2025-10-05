@@ -23,9 +23,6 @@ export async function POST(req: Request) {
       })
       .returning();
 
-    // Emit via socket.io
-    global._ioServer?.to(roomId).emit("receive_message", newMessage);
-
     return new Response(
       JSON.stringify({ success: true, message: newMessage }),
       { status: 200 }

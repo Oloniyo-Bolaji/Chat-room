@@ -1,4 +1,3 @@
-// hooks/useSocket.ts
 "use client";
 
 import { useEffect, useState } from "react";
@@ -11,7 +10,7 @@ export const useSocket = (): Socket | null => {
 
   useEffect(() => {
     if (!socketInstance) {
-      socketInstance = io(process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3000", {
+      socketInstance = io({
         path: "/api/socket",
       });
     }
