@@ -1,6 +1,6 @@
 // app/api/rooms/join/route.ts
 import { db } from "@/lib/database";
-import { roomMembersTable, roomsTable, usersTable } from "@/lib/database/schema";
+import { roomMembersTable, roomsTable } from "@/lib/database/schema";
 import { eq } from "drizzle-orm";
 
 export async function POST(req: Request) {

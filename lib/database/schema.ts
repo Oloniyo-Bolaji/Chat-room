@@ -6,7 +6,6 @@ import {
   text,
   timestamp,
   boolean,
-  jsonb,
   unique,
 } from "drizzle-orm/pg-core";
 

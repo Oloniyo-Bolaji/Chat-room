@@ -24,7 +24,7 @@ type Props = {
 };
 
 type Room = {
-  id?: string; // 👈 backend returns room id
+  id?: string; 
   name: string;
   description: string;
   avatar: string;
@@ -32,7 +32,7 @@ type Room = {
 
 const CreateRoom = ({ open, onOpenChange }: Props) => {
   const { data: session } = useSession();
-  const socket = useSocket(); // 👈 get socket instance
+  const socket = useSocket(); 
 
   const [roomDetails, setRoomDetails] = useState<Room>({
     name: "",
@@ -54,7 +54,7 @@ const CreateRoom = ({ open, onOpenChange }: Props) => {
         name: roomDetails.name,
         description: roomDetails.description,
         avatar: roomDetails.avatar,
-        creatorId: session.user.id, // pass creator id
+        creatorId: session.user.id, 
       }),
     });
 

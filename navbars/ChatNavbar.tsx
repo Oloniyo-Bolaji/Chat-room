@@ -14,7 +14,7 @@ const ChatNavbar = () => {
   const [openDialog, setOpenDialog] = useState(false);
 
   return (
-    <nav className="h-15 flex items-center justify-between px-5 bg-[#9B5DE5]">
+    <nav className="h-15 flex items-center justify-between px-5 bg-[#9B5DE5] fixed w-full">
       <div>
         <h2 className="font-bold sm:text-xl text-base">Chats</h2>
       </div>

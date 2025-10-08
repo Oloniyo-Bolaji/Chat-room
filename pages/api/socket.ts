@@ -30,18 +30,37 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
     io.on("connection", (socket) => {
       console.log("✅ User connected:", socket.id);
 
-      // Join a room
-      socket.on("join_room", (roomId: string) => {
+      socket.on("join_room", (data) => {
+        const { roomId, userName, silent } = data;
         socket.join(roomId);
-        console.log(`👥 Socket ${socket.id} joined room ${roomId}`);
+        
+        // Only emit system message if NOT silent
+        if (!silent && userName) {
+          socket.to(roomId).emit("user_joined", {
+            roomId: roomId,
+            senderId: "system",
+            text: `${userName} joined the room`,
+            timestamp: new Date().toISOString(),
+            sender: {
+              id: "system",
+              name: "system",
+              email: "",
+              image: "",
+              username: "system",
+            },
+          });
+          console.log(`📢 ${userName} joined room ${roomId}`);
+        } else {
+          console.log(`🔇 Silent rejoin to room ${roomId}`);
+        }
       });
 
       socket.on("send_message", (msgPayload) => {
         // Broadcast to everyone in the room immediately
-        console.log("new message:", msgPayload)
-        io.to(msgPayload.roomId).emit("receive_message", msgPayload);
+        console.log("new message:", msgPayload);
+        socket.to(msgPayload.roomId).emit("receive_message", msgPayload);
       });
-      
+
       // If the creator makes a new room, join automatically
       socket.on("create_room", (room) => {
         socket.join(room.id); // 👈 ensure creator joins their own room

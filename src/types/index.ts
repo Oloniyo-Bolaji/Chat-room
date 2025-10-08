@@ -14,14 +14,22 @@ export type Room = {
   roomName: string;
   description?: string;
   messages: ChatMessage[];
+  lastMessage: ChatMessage;
   avatar?: string;
   creatorId?: string;
 };
 
 export type ChatMessage = {
   text: string;
-  roomId:string;
+  roomId: string;
   senderId: string;
   timestamp: string;
-  sender: User;
+  createdAt?: string;
+  sender: {
+    id: string;
+    name: string;
+    email: string;
+    image: string;
+    username: string;
+  };
 };

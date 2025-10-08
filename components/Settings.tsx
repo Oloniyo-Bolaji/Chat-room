@@ -1,6 +1,6 @@
 "use client";
 
-import { User } from "@/src/types/user";
+import { User } from "@/src/types";
 import { signOut, useSession } from "next-auth/react";
 import Image from "next/image";
 import React, { useEffect, useState } from "react";

@@ -34,35 +34,3 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-
-// ✅ Fetch all users' emails
-const users = await db.select().from(usersTable);
-
-for (const user of users) {
-  if (user.email) {
-    await sendMail({
-      to: user.email,
-      subject: `New Room Created: ${newRoom.roomName}`,
-      text: `${session.user.name} created a new room: ${newRoom.roomName}\n\nDescription: ${newRoom.description}`,
-    });
-  }
-}
-
-
-        <div>
-          <h1>AVailable Rooms</h1>
-          {availableRooms.map((room) => (
-            <ChatJoinCard
-              key={room.id}
-              name={room.roomName}
-              avatarUrl={room.avatar}
-              onClick={() => joinRoom(room.id)}
-            />
-          ))}
-        </div>
-
-        lastMessage={
-              room.messages.length > 0
-                ? room.messages[room.messages.length - 1].text
-                : ""
-            }

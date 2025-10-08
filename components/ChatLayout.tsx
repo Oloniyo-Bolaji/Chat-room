@@ -6,9 +6,10 @@ import ChatUserCard from "./ChatCard";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Send } from "lucide-react";
 import { useSession } from "next-auth/react";
-import { User, Room, ChatMessage } from "@/src/types";
-import ChatJoinCard from "./ChatJoinCard";
+import { Room, ChatMessage, User } from "@/src/types";
 import Message from "./ChatMessage";
+import ChatJoinCard from "./ChatJoinCard";
+
 
 const ChatLayout = () => {
   const socket = useSocket();
@@ -22,14 +23,31 @@ const ChatLayout = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
 
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    if (!session?.user?.id) return;
+
+    const fetchUser = async () => {
+      try {
+        const res = await fetch(`/api/users/${session.user.id}`);
+        const result = await res.json();
+
+        if (result.success && result.data) {
+          const data = result.data;
+          setUser(data);
+        }
+      } catch (err) {
+        console.error("Failed to load user details:", err);
+      }
+    };
+
+    fetchUser();
+  }, [session?.user?.id]);
 
   // Fetch all rooms on page load
   useEffect(() => {
     const fetchRooms = async () => {
       const res = await fetch("/api/rooms");
       const data = await res.json();
+      console.log(data);
       if (data.success) {
         setJoinedRooms(data.joinedRooms);
         setAvailableRooms(data.availableRooms);
@@ -43,7 +61,7 @@ const ChatLayout = () => {
     if (!socket) return;
 
     const handleRoomCreated = (newRoom: Room) => {
-      // If creator , add to joinedRooms and remove from availableRooms
+      // If creator, add to joinedRooms and remove from availableRooms
       if (newRoom.creatorId && newRoom.creatorId === session?.user?.id) {
         setJoinedRooms((prev) => {
           if (prev.some((r) => r.id === newRoom.id)) return prev;
@@ -67,11 +85,11 @@ const ChatLayout = () => {
     };
   }, [socket, session?.user?.id]);
 
-  // Select a chat (load messages + room details)
-  const selectChat = async (id: string) => {
-    if (socket) {
-      socket.emit("join_room", id);
-      console.log(`Joined socket room: ${id}`);
+  const selectChat = async (id: string, skipSocketJoin = false) => {
+    // Only rejoin the socket room if explicitly needed (not during initial join)
+    if (socket && !skipSocketJoin) {
+      socket.emit("join_room", { roomId: id, silent: true });
+      console.log(`Rejoined socket room: ${id}`);
     }
 
     try {
@@ -80,6 +98,7 @@ const ChatLayout = () => {
       const roomData = await roomRes.json();
       if (roomData.success) {
         setSelectedChat(roomData.data);
+        console.log(roomData.data);
       }
       // Fetch messages
       const res = await fetch(`/api/rooms/${id}/messages`);
@@ -105,8 +124,19 @@ const ChatLayout = () => {
 
     socket.on("receive_message", handleReceiveMessage);
 
+    socket.on("user_joined", (data: ChatMessage) => {
+      console.log("🔔 user_joined event received:", data);
+      // Only add if message has text
+      if (data && data.text && data.text.trim()) {
+        setMessages((prev) => [...prev, data]);
+      } else {
+        console.warn("⚠️ Empty user_joined message ignored:", data);
+      }
+    });
+
     return () => {
       socket.off("receive_message", handleReceiveMessage);
+      socket.off("user_joined");
     };
   }, [socket, selectedChat]);
 
@@ -121,20 +151,27 @@ const ChatLayout = () => {
     const msgPayload = {
       roomId: selectedChat.id,
       senderId: session.user.id,
-      text: message,
+      text: message.trim(),
       timestamp: new Date().toISOString(),
       sender: {
         id: session.user.id,
         name: session.user.name ?? "Unknown",
         email: session.user.email ?? "",
-        image: session.user.image ?? null,
+        image: session.user.image ?? "",
+        username: user?.username ?? "Anonymous",
       },
     };
 
-    // 1. Emit immediately (real-time)
+    // Add message to local state immediately (optimistic update)
+    setMessages((prev) => [...prev, msgPayload]);
+    
+    // Clear input immediately
+    setMessage("");
+
+    // Emit to socket (real-time for others)
     socket.emit("send_message", msgPayload);
 
-    // 2. Save in DB (background)
+    // Save in DB (background)
     try {
       await fetch(`/api/rooms/messages`, {
         method: "POST",
@@ -145,8 +182,6 @@ const ChatLayout = () => {
       console.error("Save failed:", err);
       alert("Message sent but not saved, please retry");
     }
-
-    setMessage("");
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -173,20 +208,35 @@ const ChatLayout = () => {
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error);
 
-      // Step 2: join the socket.io room
-      socket?.emit("join_room", roomId);
-
-      setAvailableRooms((prev) => {
-        // remove the room if it exists in availableRooms
-        return prev.filter((r) => r.id !== roomId);
-      });
-
+      // Move the room from available to joined
+      setAvailableRooms((prev) => prev.filter((r) => r.id !== roomId));
+      
       setJoinedRooms((prev) => {
-        // only add if not already joined
         if (prev.some((r) => r.id === roomId)) return prev;
         const room = availableRooms.find((r) => r.id === roomId);
         return room ? [...prev, room] : prev;
       });
+
+      // Step 2: First, load room data and messages (skipSocketJoin=true)
+      await selectChat(roomId, true);
+
+      // Step 3: THEN join the socket.io room WITH user info (triggers system message)
+      // This ensures the component is listening before the system message arrives
+      if (socket) {
+        if (socket.connected) {
+          socket.emit("join_room", {
+            roomId,
+            userName: user?.username || session?.user?.name,
+          });
+        } else {
+          socket.once("connect", () => {
+            socket.emit("join_room", {
+              roomId,
+              userName: user?.username || session?.user?.name,
+            });
+          });
+        }
+      }
 
       return true;
     } catch (err) {
@@ -196,7 +246,7 @@ const ChatLayout = () => {
   };
 
   return (
-    <div className="h-screen flex sm:gap-5">
+    <div className="h-screen flex sm:gap-5 pt-15">
       {/* Chat list */}
       <div
         className={`w-full md:w-1/3 flex flex-col gap-2.5 py-1.5 px-2.5 bg-[#9B5DE540] ${
@@ -207,9 +257,17 @@ const ChatLayout = () => {
           <ChatUserCard
             key={room.id}
             name={room.roomName}
-            lastMessage=""
+            lastMessage={room.lastMessage}
             avatarUrl={room.avatar}
             onClick={() => selectChat(room.id)}
+          />
+        ))}
+        {availableRooms.map((room) => (
+          <ChatJoinCard
+            key={room.id}
+            name={room.roomName}
+            avatarUrl={room.avatar}
+            onClick={() => joinRoom(room.id)}
           />
         ))}
       </div>
@@ -249,14 +307,14 @@ const ChatLayout = () => {
             <div className="flex-1 p-4 overflow-y-auto space-y-3">
               {messages.length > 0 ? (
                 messages.map((msg, idx) => {
-                  const isMine = msg.senderId === session?.user?.id;
+                  const isMine = session?.user?.id ?? "";
                   return <Message key={idx} isMine={isMine} msg={msg} />;
                 })
               ) : (
                 <p className="text-gray-500">No messages yet...</p>
               )}
+              <div ref={chatEndRef} />
             </div>
-            <div ref={chatEndRef} />
 
             {/* Input */}
             <div className="p-4 border-t flex">
