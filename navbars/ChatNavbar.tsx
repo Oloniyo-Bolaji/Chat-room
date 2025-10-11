@@ -20,11 +20,11 @@ const ChatNavbar = () => {
       </div>
       <div className="h-12 flex items-center gap-2.5">
         {/* Button that opens create-room dialog */}
-        <Button variant="outline" onClick={() => setOpenDialog(true)}>
+        <Button variant="colored" onClick={() => setOpenDialog(true)}>
           <Plus />
         </Button>
 
-        <Button variant="link" onClick={() => router.push("/")}>
+        <Button variant="link" onClick={() => router.push("/notifications")}>
           <Bell />
         </Button>
 

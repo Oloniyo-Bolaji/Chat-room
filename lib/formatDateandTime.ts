@@ -21,7 +21,7 @@ export const formatTime = (isoString: string): string => {
   });
 };
 
-export const formatChatTime = (isoString: string): string  => {
+export const formatChatTime = (isoString: string ): string  => {
   const date = new Date(isoString);
   const now = new Date();
 

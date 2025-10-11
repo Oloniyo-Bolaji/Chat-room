@@ -15,6 +15,7 @@ export type Room = {
   description?: string;
   messages: ChatMessage[];
   lastMessage: ChatMessage;
+  unreadCount?: number | undefined;
   avatar?: string;
   creatorId?: string;
 };

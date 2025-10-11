@@ -76,6 +76,7 @@ export const messageReadsTable = pgTable("message_reads", {
   lastReadMessageId: uuid("last_read_message_id").references(
     () => messagesTable.id
   ),
+  lastReadAt: timestamp("last_read_at"),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
@@ -116,17 +117,20 @@ export const messagesRelations = relations(messagesTable, ({ one }) => ({
   }),
 }));
 
-export const messageReadsRelations = relations(messageReadsTable, ({ one }) => ({
-  user: one(usersTable, {
-    fields: [messageReadsTable.userId],
-    references: [usersTable.id],
-  }),
-  room: one(roomsTable, {
-    fields: [messageReadsTable.roomId],
-    references: [roomsTable.id],
-  }),
-  lastReadMessage: one(messagesTable, {
-    fields: [messageReadsTable.lastReadMessageId],
-    references: [messagesTable.id],
-  }),
-}));
+export const messageReadsRelations = relations(
+  messageReadsTable,
+  ({ one }) => ({
+    user: one(usersTable, {
+      fields: [messageReadsTable.userId],
+      references: [usersTable.id],
+    }),
+    room: one(roomsTable, {
+      fields: [messageReadsTable.roomId],
+      references: [roomsTable.id],
+    }),
+    lastReadMessage: one(messagesTable, {
+      fields: [messageReadsTable.lastReadMessageId],
+      references: [messagesTable.id],
+    }),
+  })
+);

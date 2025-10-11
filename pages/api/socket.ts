@@ -33,7 +33,7 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
       socket.on("join_room", (data) => {
         const { roomId, userName, silent } = data;
         socket.join(roomId);
-        
+
         // Only emit system message if NOT silent
         if (!silent && userName) {
           socket.to(roomId).emit("user_joined", {
@@ -55,15 +55,31 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
         }
       });
 
+      socket.on("user_typing", (data) => {
+        const { user, roomId, typing } = data;
+        console.log(`${user} is ${typing ? "typing..." : "stopped typing"}`);
+
+        // Broadcast to other users in the same room
+        socket.to(roomId).emit("user_typing", {
+          user: user,
+          roomId: roomId,
+          typing: typing,
+        });
+      });
+      
       socket.on("send_message", (msgPayload) => {
-        // Broadcast to everyone in the room immediately
-        console.log("new message:", msgPayload);
+        console.log("💬 New message in room:", msgPayload.roomId);
+
+        // 1. Emit for message display in current chat
         socket.to(msgPayload.roomId).emit("receive_message", msgPayload);
+
+        // 2. Emit for unread counts and last message updates
+        socket.to(msgPayload.roomId).emit("new_message", msgPayload);
       });
 
       // If the creator makes a new room, join automatically
       socket.on("create_room", (room) => {
-        socket.join(room.id); // 👈 ensure creator joins their own room
+        socket.join(room.id);
         io.emit("room_created", room);
         console.log(`📌 Creator ${socket.id} joined room ${room.id}`);
       });

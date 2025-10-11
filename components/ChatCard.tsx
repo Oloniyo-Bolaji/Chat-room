@@ -15,7 +15,7 @@ const ChatUserCard = ({
   name,
   lastMessage,
   avatarUrl,
-  unreadCount = 0,
+  unreadCount,
   onClick,
 }: ChatUserProps) => {
   return (
@@ -47,11 +47,11 @@ const ChatUserCard = ({
             {lastMessage?.createdAt ? formatChatTime(lastMessage?.createdAt) : ""}
           </span>
 
-          {unreadCount > 0 && (
-            <span className="bg-blue-500 text-white text-[10px] px-2 py-0.5 rounded-full font-medium">
+          {unreadCount && unreadCount > 0 ? (
+            <span className="bg-[#9B5DE5] text-white text-[10px] px-2 py-0.5 rounded-full font-medium">
               {unreadCount}
             </span>
-          )}
+          ) : undefined}
         </div>
       </CardContent>
     </Card>

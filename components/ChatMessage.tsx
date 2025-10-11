@@ -54,7 +54,7 @@ const Message = ({ msg, isMine }: ChatMessageProp) => {
               isSystem ? "hidden" : "block"
             } text-[10px] opacity-70 mt-1`}
           >
-            {msg.sender?.username}
+            {isMyMessage ? "Me" : msg.sender?.username}
           </span>
           <p className="text-sm">{msg.text}</p>
           <span
@@ -62,7 +62,9 @@ const Message = ({ msg, isMine }: ChatMessageProp) => {
               isSystem ? "hidden" : "block"
             } text-[8px] opacity-70 mt-1 text-right`}
           >
-            {msg?.createdAt ? formatChatTime(msg?.createdAt) : ""}
+            {msg?.timestamp || msg?.createdAt
+              ? formatChatTime(msg.timestamp ?? msg.createdAt!)
+              : ""}
           </span>
         </div>
       </div>

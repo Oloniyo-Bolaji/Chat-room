@@ -94,7 +94,7 @@ const CreateRoom = ({ open, onOpenChange }: Props) => {
           <div className="space-y-5">
             {/* Room Name */}
             <div className="grid w-full max-w-sm gap-2">
-              <Label htmlFor="room-name">Room Name</Label>
+              <Label htmlFor="room-name">Room Name *</Label>
               <Input
                 id="room-name"
                 type="text"
@@ -107,7 +107,7 @@ const CreateRoom = ({ open, onOpenChange }: Props) => {
 
             {/* Room Description */}
             <div className="grid w-full gap-2 max-w-sm">
-              <Label htmlFor="description">Room Description</Label>
+              <Label htmlFor="description">Room Description *</Label>
               <Textarea
                 id="description"
                 value={roomDetails?.description}

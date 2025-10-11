@@ -9,25 +9,37 @@ import { useSession } from "next-auth/react";
 import { Room, ChatMessage, User } from "@/src/types";
 import Message from "./ChatMessage";
 import ChatJoinCard from "./ChatJoinCard";
-
+import { Input } from "./ui/input";
+import { Button } from "./ui/button";
 
 const ChatLayout = () => {
   const socket = useSocket();
   const { data: session } = useSession();
+  const currentUserId = session?.user?.id;
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  type Typers = {
+    user: string;
+    roomId: string;
+    typing: boolean;
+  };
+  // States initialization
   const [joinedRooms, setJoinedRooms] = useState<Room[]>([]);
   const [availableRooms, setAvailableRooms] = useState<Room[]>([]);
   const [selectedChat, setSelectedChat] = useState<Room | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [message, setMessage] = useState<string>("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [typingUsers, setTypingUsers] = useState<string[]>([]);
 
+  //Fetching the User details on load of page
   useEffect(() => {
-    if (!session?.user?.id) return;
+    if (!currentUserId) return;
 
     const fetchUser = async () => {
       try {
-        const res = await fetch(`/api/users/${session.user.id}`);
+        const res = await fetch(`/api/users/${currentUserId}`);
         const result = await res.json();
 
         if (result.success && result.data) {
@@ -40,14 +52,13 @@ const ChatLayout = () => {
     };
 
     fetchUser();
-  }, [session?.user?.id]);
+  }, [currentUserId]);
 
   // Fetch all rooms on page load
   useEffect(() => {
     const fetchRooms = async () => {
       const res = await fetch("/api/rooms");
       const data = await res.json();
-      console.log(data);
       if (data.success) {
         setJoinedRooms(data.joinedRooms);
         setAvailableRooms(data.availableRooms);
@@ -56,23 +67,20 @@ const ChatLayout = () => {
     fetchRooms();
   }, []);
 
-  // Listen for new rooms
   useEffect(() => {
     if (!socket) return;
 
+    //Data received from Socket is used to set room to joined or available depending on the creator
     const handleRoomCreated = (newRoom: Room) => {
-      // If creator, add to joinedRooms and remove from availableRooms
-      if (newRoom.creatorId && newRoom.creatorId === session?.user?.id) {
+      if (newRoom.creatorId && newRoom.creatorId === currentUserId) {
         setJoinedRooms((prev) => {
           if (prev.some((r) => r.id === newRoom.id)) return prev;
           return [...prev, newRoom];
         });
-
         setAvailableRooms((prev) => prev.filter((r) => r.id !== newRoom.id));
         return;
       }
 
-      // Otherwise add to availableRooms (if not already present)
       setAvailableRooms((prev) => {
         if (prev.some((r) => r.id === newRoom.id)) return prev;
         return [...prev, newRoom];
@@ -80,13 +88,14 @@ const ChatLayout = () => {
     };
 
     socket.on("room_created", handleRoomCreated);
+
     return () => {
       socket.off("room_created", handleRoomCreated);
     };
-  }, [socket, session?.user?.id]);
+  }, [socket, currentUserId, selectedChat]);
 
   const selectChat = async (id: string, skipSocketJoin = false) => {
-    // Only rejoin the socket room if explicitly needed (not during initial join)
+    // Only rejoin the socket room if explicitly needed
     if (socket && !skipSocketJoin) {
       socket.emit("join_room", { roomId: id, silent: true });
       console.log(`Rejoined socket room: ${id}`);
@@ -98,45 +107,92 @@ const ChatLayout = () => {
       const roomData = await roomRes.json();
       if (roomData.success) {
         setSelectedChat(roomData.data);
-        console.log(roomData.data);
       }
+
       // Fetch messages
       const res = await fetch(`/api/rooms/${id}/messages`);
       const data = await res.json();
 
       if (data.success) {
         setMessages(data.messages);
+
+        // ✅ Only mark as read if there are messages
+        if (data.messages.length > 0) {
+          const lastMessage = data.messages[data.messages.length - 1];
+
+          setJoinedRooms((prev) =>
+            prev.map((room) =>
+              room.id === id ? { ...room, unreadCount: undefined } : room
+            )
+          );
+          // Mark the last message as read
+          await fetch(`/api/rooms/${id}/message-read`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              lastReadMessageId: lastMessage.id,
+              lastReadAt: new Date(),
+            }),
+          });
+        }
       }
     } catch (err) {
       console.error("Error selecting chat:", err);
     }
   };
 
+  useEffect(() => {
+    if (!socket) return;
+    //Data received from Socket is used to update last message and unread count
+    const handleOtherRoomMessage = (newMessage: ChatMessage) => {
+      console.log("🔄 New message for unread count:", newMessage);
+      if (!selectedChat || newMessage.roomId !== selectedChat.id) {
+        setJoinedRooms((prev) =>
+          prev.map((room) =>
+            room.id === newMessage.roomId
+              ? {
+                  ...room,
+                  unreadCount: (room.unreadCount || 0) + 1,
+                  lastMessage: newMessage,
+                }
+              : room
+          )
+        );
+      }
+    };
+
+    socket.on("new_message", handleOtherRoomMessage);
+
+    return () => {
+      socket.off("new_message", handleOtherRoomMessage);
+    };
+  }, [socket, selectedChat]);
+
   // Listen for new messages via socket
   useEffect(() => {
-    if (!socket || !selectedChat) return;
-
-    const handleReceiveMessage = (newMessage: ChatMessage) => {
+    if (!socket) return;
+    const handleCurrentChatMessage = (newMessage: ChatMessage) => {
       if (selectedChat && newMessage.roomId === selectedChat.id) {
         setMessages((prev) => [...prev, newMessage]);
       }
     };
 
-    socket.on("receive_message", handleReceiveMessage);
-
-    socket.on("user_joined", (data: ChatMessage) => {
+    const handleUserJoined = (data: ChatMessage) => {
       console.log("🔔 user_joined event received:", data);
-      // Only add if message has text
       if (data && data.text && data.text.trim()) {
-        setMessages((prev) => [...prev, data]);
-      } else {
-        console.warn("⚠️ Empty user_joined message ignored:", data);
+        if (selectedChat && data.roomId === selectedChat.id) {
+          setMessages((prev) => [...prev, data]);
+        }
       }
-    });
+    };
+
+    // Register all listeners
+    socket.on("receive_message", handleCurrentChatMessage);
+    socket.on("user_joined", handleUserJoined);
 
     return () => {
-      socket.off("receive_message", handleReceiveMessage);
-      socket.off("user_joined");
+      socket.off("receive_message", handleCurrentChatMessage);
+      socket.off("user_joined", handleUserJoined);
     };
   }, [socket, selectedChat]);
 
@@ -164,7 +220,6 @@ const ChatLayout = () => {
 
     // Add message to local state immediately (optimistic update)
     setMessages((prev) => [...prev, msgPayload]);
-    
     // Clear input immediately
     setMessage("");
 
@@ -210,7 +265,7 @@ const ChatLayout = () => {
 
       // Move the room from available to joined
       setAvailableRooms((prev) => prev.filter((r) => r.id !== roomId));
-      
+
       setJoinedRooms((prev) => {
         if (prev.some((r) => r.id === roomId)) return prev;
         const room = availableRooms.find((r) => r.id === roomId);
@@ -245,11 +300,79 @@ const ChatLayout = () => {
     }
   };
 
+  const handleTyping = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!socket) return;
+    setMessage(e.target.value);
+
+    // Clear previous timeout
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+
+    // Emit typing start
+    socket.emit("user_typing", {
+      user: user?.username,
+      roomId: selectedChat?.id,
+      typing: e.target.value ? true : false,
+    });
+
+    // Set timeout to stop typing after 2 seconds of inactivity
+    if (e.target.value) {
+      typingTimeoutRef.current = setTimeout(() => {
+        socket.emit("user_typing", {
+          user: user?.username,
+          roomId: selectedChat?.id,
+          typing: false,
+        });
+      }, 2000);
+    }
+  };
+
+  // Listen for typing events
+  useEffect(() => {
+    if (!socket || !selectedChat) return;
+
+    const handleUserTyping = (data: Typers) => {
+      if (data.roomId !== selectedChat.id) return;
+
+      if (data.typing) {
+        // Add user to typing list if not already there
+        setTypingUsers((prev) => {
+          if (!prev.includes(data.user)) {
+            return [...prev, data.user];
+          }
+          return prev;
+        });
+      } else {
+        // Remove user from typing list
+        setTypingUsers((prev) => prev.filter((u) => u !== data.user));
+      }
+    };
+
+    socket.on("user_typing", handleUserTyping);
+
+    return () => {
+      socket.off("user_typing", handleUserTyping);
+    };
+  }, [socket, selectedChat]);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+    };
+  }, []);
+
   return (
     <div className="h-screen flex sm:gap-5 pt-15">
       {/* Chat list */}
       <div
-        className={`w-full md:w-1/3 flex flex-col gap-2.5 py-1.5 px-2.5 bg-[#9B5DE540] ${
+        className={`w-full md:w-1/3 flex flex-col gap-2.5 py-1.5 px-2.5 bg-[#9B5DE560] ${
           selectedChat !== null ? "hidden md:block" : "block"
         }`}
       >
@@ -258,6 +381,7 @@ const ChatLayout = () => {
             key={room.id}
             name={room.roomName}
             lastMessage={room.lastMessage}
+            unreadCount={room.unreadCount}
             avatarUrl={room.avatar}
             onClick={() => selectChat(room.id)}
           />
@@ -292,15 +416,27 @@ const ChatLayout = () => {
                     {selectedChat.roomName.charAt(0)}
                   </AvatarFallback>
                 </Avatar>
-                <p className="font-bold">{selectedChat.roomName}</p>
+                <div className="flex flex-col gap-1.5">
+                  <p className="font-bold">{selectedChat.roomName}</p>
+                  {typingUsers.length > 0 && (
+                    <p className="text-sm text-gray-500 italic">
+                      {typingUsers.length === 1
+                        ? `${typingUsers[0]} is typing...`
+                        : typingUsers.length === 2
+                        ? `${typingUsers[0]} and ${typingUsers[1]} are typing...`
+                        : `${typingUsers.length} people are typing...`}
+                    </p>
+                  )}
+                </div>
               </div>
 
-              <button
-                className="md:hidden text-blue-500"
+              <Button
+                variant="link"
+                className="md:hidden"
                 onClick={() => setSelectedChat(null)}
               >
                 Back
-              </button>
+              </Button>
             </div>
 
             {/* Messages */}
@@ -318,20 +454,21 @@ const ChatLayout = () => {
 
             {/* Input */}
             <div className="p-4 border-t flex">
-              <input
+              <Input
                 type="text"
                 value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                onKeyPress={handleKeyPress}
+                onChange={handleTyping}
+                onKeyUpCapture={handleKeyPress}
                 placeholder="Type a message"
                 className="flex-1 border rounded px-3 py-2"
               />
-              <button
-                className="ml-2 px-4 py-2 bg-blue-500 text-white rounded"
+              <Button
+                variant="colored"
+                className="ml-2 px-4 py-2"
                 onClick={sendMessage}
               >
                 <Send />
-              </button>
+              </Button>
             </div>
           </>
         ) : (
